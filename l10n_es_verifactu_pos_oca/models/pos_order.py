@@ -126,7 +126,17 @@ class PosOrder(models.Model):
 
     def _is_verifactu_order(self):
         self.ensure_one()
-        return self.exists() and not self.to_invoice and self.verifactu_enabled
+        # An order that is not a simplified invoice has no fiscal number
+        # (l10n_es_unique_id), so it cannot be registered as one: either it is
+        # over the simplified limit and must be invoiced, or l10n_es_pos_oca did
+        # not assign a number. Registering it anyway sends an empty
+        # NumSerieFactura to the AEAT.
+        return (
+            self.exists()
+            and not self.to_invoice
+            and self.verifactu_enabled
+            and self.is_l10n_es_simplified_invoice
+        )
 
     def _is_refund_order(self):
         """Check if this POS order is a refund"""
@@ -203,8 +213,11 @@ class PosOrder(models.Model):
         return VERIFACTU_VALID_POS_STATES
 
     def _get_document_serial_number(self):
-        # return (self.l10n_es_unique_id or self.pos_reference)[0:60]
-        return (self.l10n_es_unique_id or self.pos_reference)[0:60]
+        # NumSerieFactura must be the fiscal simplified-invoice number assigned by
+        # l10n_es_pos_oca. Both fields are False on an order that never got one
+        # (e.g. over the simplified limit), so coerce to "" instead of letting
+        # `False[0:60]` raise, which would surface as `numserie=false` in the QR.
+        return (self.l10n_es_unique_id or self.pos_reference or "")[0:60]
 
     def _get_mapping_key(self):
         return "out_invoice"
@@ -245,8 +258,13 @@ class PosOrder(models.Model):
             ]
         )
 
-    def _get_verifactu_hash_string(self):
-        """Gets the verifactu hash string"""
+    def _get_verifactu_hash_string(self, cancel=False):
+        """Gets the verifactu hash string.
+
+        The ``cancel`` argument is part of the mixin signature: the base
+        ``_generate_verifactu_chaining`` always calls this method with it, so it
+        cannot be omitted here.
+        """
         if (
             not self.verifactu_enabled
             or self.state not in VERIFACTU_VALID_POS_STATES
@@ -256,12 +274,22 @@ class PosOrder(models.Model):
         issuer = self._get_verifactu_issuer()
         serial_number = self._get_document_serial_number()
         expedition_date = self._change_date_format(self._get_document_date())
+        previous_hash = self._get_verifactu_previous_hash()
+        registration_date = self._get_verifactu_registration_date()
+        if cancel:
+            # Field set and order for a "registro de anulación", per the AEAT
+            # hash specification (v0.1.2, section 3.b).
+            return (
+                f"IDEmisorFacturaAnulada={issuer}&"
+                f"NumSerieFacturaAnulada={serial_number}&"
+                f"FechaExpedicionFacturaAnulada={expedition_date}&"
+                f"Huella={previous_hash}&"
+                f"FechaHoraHusoGenRegistro={registration_date}"
+            )
         document_type = self._get_verifactu_document_type()
         _taxes_dict, amount_tax, amount_total = self._get_verifactu_taxes_and_total()
         amount_tax = round(amount_tax, 2)
         amount_total = round(amount_total, 2)
-        previous_hash = self._get_verifactu_previous_hash()
-        registration_date = self._get_verifactu_registration_date()
         verifactu_hash_string = (
             f"IDEmisorFactura={issuer}&"
             f"NumSerieFactura={serial_number}&"
