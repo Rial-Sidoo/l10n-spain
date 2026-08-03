@@ -177,6 +177,10 @@ Contributors
 
   - Luis J. Salvatierra
 
+- MDSX:
+
+  - Manuel Diez Silva <manu@mdsx.es>
+
 - Batista10:
 
   - Ivan Vilata i Balaguer
