@@ -115,7 +115,7 @@ class PosOrder(models.Model):
         except UserError as e:
             # Don't re-raise the error to avoid blocking POS operations
             _logger.error(
-                "[ID: %d, REF: %s, INV: %s] " "Failed to create verifactu chaining: %s",
+                "[ID: %d, REF: %s, INV: %s] Failed to create verifactu chaining: %s",
                 pos_order.id,
                 pos_order.pos_reference,
                 pos_order.l10n_es_unique_id,
@@ -582,39 +582,33 @@ class PosOrder(models.Model):
                 self.env._(
                     "[ID: %(id)d, REF: %(ref)s, INV: %(inv)s] "
                     "The POS order cannot be sent to "
-                    "Verifactu because it does not have a fiscal position."
+                    "Verifactu because it does not have a fiscal position.",
+                    id=self.id,
+                    ref=self.pos_reference,
+                    inv=self.l10n_es_unique_id,
                 )
-                % {
-                    "id": self.id,
-                    "ref": self.pos_reference,
-                    "inv": self.l10n_es_unique_id,
-                }
             )
         if not self.verifactu_tax_key:
             raise UserError(
                 self.env._(
                     "[ID: %(id)d, REF: %(ref)s, INV: %(inv)s] "
                     "The POS order cannot be sent to "
-                    "Verifactu because it does not have a tax key."
+                    "Verifactu because it does not have a tax key.",
+                    id=self.id,
+                    ref=self.pos_reference,
+                    inv=self.l10n_es_unique_id,
                 )
-                % {
-                    "id": self.id,
-                    "ref": self.pos_reference,
-                    "inv": self.l10n_es_unique_id,
-                }
             )
         if not self.verifactu_registration_key:
             raise UserError(
                 self.env._(
                     "[ID: %(id)d, REF: %(ref)s, INV: %(inv)s] "
                     "The POS order cannot be sent to "
-                    "Verifactu because it does not have a registration key."
+                    "Verifactu because it does not have a registration key.",
+                    id=self.id,
+                    ref=self.pos_reference,
+                    inv=self.l10n_es_unique_id,
                 )
-                % {
-                    "id": self.id,
-                    "ref": self.pos_reference,
-                    "inv": self.l10n_es_unique_id,
-                }
             )
 
         if not self._check_inconsistent_taxes():
@@ -622,13 +616,11 @@ class PosOrder(models.Model):
                 self.env._(
                     "[ID: %(id)d, REF: %(ref)s, INV: %(inv)s] "
                     "The POS order cannot be sent to "
-                    "Verifactu because there are some inconsistent taxes on lines."
+                    "Verifactu because there are some inconsistent taxes on lines.",
+                    id=self.id,
+                    ref=self.pos_reference,
+                    inv=self.l10n_es_unique_id,
                 )
-                % {
-                    "id": self.id,
-                    "ref": self.pos_reference,
-                    "inv": self.l10n_es_unique_id,
-                }
             )
 
         if not self._check_all_taxes_mapped():
@@ -636,13 +628,11 @@ class PosOrder(models.Model):
                 self.env._(
                     "[ID: %(id)d, REF: %(ref)s, INV: %(inv)s] "
                     "The POS order cannot be sent to "
-                    "Verifactu because it does not have all taxes mapped."
+                    "Verifactu because it does not have all taxes mapped.",
+                    id=self.id,
+                    ref=self.pos_reference,
+                    inv=self.l10n_es_unique_id,
                 )
-                % {
-                    "id": self.id,
-                    "ref": self.pos_reference,
-                    "inv": self.l10n_es_unique_id,
-                }
             )
         return super()._check_verifactu_configuration()
 
@@ -682,9 +672,9 @@ class PosOrder(models.Model):
             raise UserError(
                 self.env._(
                     "The POS order %s cannot be sent to Verifactu because"
-                    "it does not have any taxes."
+                    "it does not have any taxes.",
+                    self.pos_reference,
                 )
-                % self.pos_reference
             )
 
         document_date = self._get_document_fiscal_date()
@@ -722,14 +712,12 @@ class PosOrder(models.Model):
                         "[ID: %(id)d, REF: %(ref)s, INV: %(inv)s] "
                         "You cannot change the %(fields)s "
                         "of document already registered at VERI*FACTU. You must cancel"
-                        "the document and create a new one with the correct value."
+                        "the document and create a new one with the correct value.",
+                        id=order.id,
+                        ref=order.pos_reference,
+                        inv=order.l10n_es_unique_id,
+                        fields=", ".join(protected_field_names),
                     )
-                    % {
-                        "id": order.id,
-                        "ref": order.pos_reference,
-                        "inv": order.l10n_es_unique_id,
-                        "fields": ", ".join(protected_field_names),
-                    }
                 )
 
         return super().write(vals)
