@@ -1,6 +1,6 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class PosConfig(models.Model):
@@ -35,8 +35,7 @@ class PosConfig(models.Model):
     l10n_es_simplified_invoice_limit = fields.Float(
         string="Sim.Inv limit amount",
         digits="Account",
-        help="Over this amount is not legally posible to create "
-        "a simplified invoice",
+        help="Over this amount is not legally posible to create a simplified invoice",
         default=3000,  # Spanish legal limit
     )
     l10n_es_simplified_invoice_prefix = fields.Char(
@@ -83,7 +82,7 @@ class PosConfig(models.Model):
                 prefix = f"{initial_prefix}_{ith}"
             simp_inv_seq_id = self.env["ir.sequence"].create(
                 {
-                    "name": _("Simplified Invoice %s") % vals["name"],
+                    "name": self.env._("Simplified Invoice %s", vals["name"]),
                     "implementation": "standard",
                     "padding": self._get_default_padding(),
                     "prefix": prefix,
@@ -142,8 +141,13 @@ class PosConfig(models.Model):
         )
 
     def _get_l10n_es_sequence_name(self):
-        """HACK: This is done for getting the proper translation."""
-        return _("Simplified Invoice %s")
+        """HACK: This is done for getting the proper translation.
+
+        Returned as a plain str (not a lazy translation) because callers
+        apply ``%`` on the result themselves, and LazyGettext does not
+        support that operator.
+        """
+        return str(self.env._("Simplified Invoice %s"))
 
     def next_l10n_es_sequence_number(self):
         seq = self.l10n_es_simplified_invoice_sequence_id

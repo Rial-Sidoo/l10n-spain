@@ -43,7 +43,7 @@ class PosOrder(models.Model):
         return res
 
     @api.model
-    def _update_sequence_number(self, pos):
+    def _update_l10n_es_simplified_invoice_sequence(self, pos):
         pos.l10n_es_simplified_invoice_sequence_id.next_by_id()
 
     @api.model
@@ -64,7 +64,7 @@ class PosOrder(models.Model):
                 }
             )
             if not pos.prevent_offline_validation:
-                self._update_sequence_number(pos)
+                self._update_l10n_es_simplified_invoice_sequence(pos)
         return super()._process_order(pos_order, existing_order)
 
     def _prepare_refund_values(self, current_session):
