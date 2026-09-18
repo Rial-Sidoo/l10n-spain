@@ -6,15 +6,22 @@
         t-inherit="point_of_sale.TicketScreen"
         t-inherit-mode="extension"
     >
-        <xpath expr="//div[hasclass('header-row')]/div[2]" position="after">
-            <div class="col wide">Simplified Invoice</div>
-        </xpath>
-        <xpath expr="//div[hasclass('order-row')]/div[2]" position="after">
-            <div class="col wide">
-                <div t-if="env.isMobile">Simplified Invoice</div>
-                <div>
+        <xpath
+            expr="//tr[hasclass('order-row')]/td[hasclass('order-name')]"
+            position="after"
+        >
+            <td class="align-middle">
+                <div class="fw-bolder">
                     <t t-if="order.l10n_es_unique_id" t-esc="order.l10n_es_unique_id" />
                 </div>
+            </td>
+        </xpath>
+        <xpath
+            expr="//div[hasclass('order-row')]/div[hasclass('order-name')]"
+            position="inside"
+        >
+            <div t-if="order.l10n_es_unique_id" class="small text-muted">
+                <t t-esc="order.l10n_es_unique_id" />
             </div>
         </xpath>
     </t>
