@@ -13,18 +13,15 @@ patch(PosOrder.prototype, {
      */
     getBaseByTax() {
         const base_by_tax = {};
-        this.get_orderlines().forEach(function (line) {
-            const tax_detail = line.get_tax_details();
-            const base_price = line.get_price_without_tax();
-            if (tax_detail) {
-                Object.keys(tax_detail).forEach(function (tax) {
-                    if (Object.prototype.hasOwnProperty.call(base_by_tax, tax)) {
-                        base_by_tax[tax] += base_price;
-                    } else {
-                        base_by_tax[tax] = base_price;
-                    }
-                });
-            }
+        this.getOrderlines().forEach(function (line) {
+            (line.prices.taxes_data || []).forEach(function (taxData) {
+                const tax = taxData.tax.id;
+                if (Object.prototype.hasOwnProperty.call(base_by_tax, tax)) {
+                    base_by_tax[tax] += taxData.base_amount;
+                } else {
+                    base_by_tax[tax] = taxData.base_amount;
+                }
+            });
         });
         return base_by_tax;
     },
@@ -48,7 +45,7 @@ patch(PosOrder.prototype, {
      */
     export_as_JSON() {
         const res = super.export_as_JSON(...arguments);
-        res.to_invoice = this.is_to_invoice();
+        res.to_invoice = this.isToInvoice();
         if (!res.to_invoice) {
             res.l10n_es_unique_id = this.l10n_es_unique_id;
             res.l10n_es_simplified_number = this.l10n_es_simplified_number;
