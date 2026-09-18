@@ -5,10 +5,13 @@
         t-inherit="point_of_sale.OrderReceipt"
         t-inherit-mode="extension"
     >
-        <xpath expr="//div[@t-if='props.data.pos_qr_code']" position="attributes">
+        <xpath
+            expr="//div[@t-if='order.company.point_of_sale_use_ticket_qr_code and order.finalized']"
+            position="attributes"
+        >
             <attribute
                 name="t-if"
-            >props.data.pos_qr_code or props.data.ticket_code and (!props.data.is_simplified_config or props.data.is_to_invoice)</attribute>
+            >(order.company.point_of_sale_use_ticket_qr_code and order.finalized) or (order.ticket_code and (!order.config.is_simplified_config or order.to_invoice))</attribute>
         </xpath>
     </t>
 </templates>
