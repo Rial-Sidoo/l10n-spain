@@ -707,3 +707,21 @@ class TestL10nEsVerifactuPOS(TestVerifactuCommon):
         # Should raise NotImplementedError
         with self.assertRaises(NotImplementedError):
             order.cancel_verifactu()
+
+    def test_pos_verifactu_start_date_is_loaded_in_pos_ui(self):
+        """The PoS UI needs the start date to hide the QR code before it."""
+        fields = self.env["res.company"]._load_pos_data_fields(self.pos_config)
+        self.assertIn("verifactu_start_date", fields)
+
+    def test_pos_verifactu_journal_flag_reaches_the_pos_ui(self):
+        """The PoS UI needs the journal flag to hide the QR when it is off.
+
+        The journal the registration looks at is the PoS one, which a standard
+        install creates with type `sale` on this module's test setup, so the
+        flag mirrors journal_id.verifactu_enabled directly.
+        """
+        self.assertTrue(self.pos_config.journal_id.verifactu_enabled)
+        self.assertTrue(self.pos_config.verifactu_journal_enabled)
+
+        self.pos_config.journal_id.verifactu_enabled = False
+        self.assertFalse(self.pos_config.verifactu_journal_enabled)
