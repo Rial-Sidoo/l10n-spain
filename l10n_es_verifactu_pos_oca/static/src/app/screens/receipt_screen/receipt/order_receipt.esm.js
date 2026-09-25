@@ -20,19 +20,27 @@ patch(OrderReceipt.prototype, {
      */
     get verifactuQr() {
         const order = this.order;
+        const startDate = order.company.verifactu_start_date;
+        // The registration dates the document by the UTC date of date_order
+        // (see the backend's _change_date_format / _get_document_date), so
+        // the QR code follows it to keep both on the same day for orders
+        // around midnight.
+        const documentDate = order.date_order.toUTC();
         const isEnabled =
             order.verifactu_enabled &&
+            order.config.verifactu_journal_enabled &&
             order.is_l10n_es_simplified_invoice &&
+            !order.to_invoice &&
+            (!startDate || documentDate.toFormat("yyyy-MM-dd") >= startDate) &&
             (!order.fiscal_position || order.fiscal_position.aeat_active);
         if (!isEnabled) {
             return false;
         }
         const nif = (order.company.vat || "").replace(/^ES/i, "");
-        const fecha = order.date_order.toFormat("dd-MM-yyyy");
         const params = new URLSearchParams({
             nif: nif,
-            numserie: order.l10n_es_unique_id || "",
-            fecha: fecha,
+            numserie: (order.l10n_es_unique_id || "").substring(0, 60),
+            fecha: documentDate.toFormat("dd-MM-yyyy"),
             importe: order.amount_total.toFixed(2),
         });
         const url = `${order.config.verifactu_base_url}?${params.toString()}`;
