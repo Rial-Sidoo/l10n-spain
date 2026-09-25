@@ -18,6 +18,8 @@
         ],
     },
     "data": [
+        "data/ir_config_parameter.xml",
+        "data/ir_cron.xml",
         "views/pos_order_view.xml",
     ],
 }
