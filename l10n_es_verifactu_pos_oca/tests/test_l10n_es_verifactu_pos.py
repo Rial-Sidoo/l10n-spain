@@ -1,9 +1,17 @@
 import uuid
+from unittest.mock import patch
+
+import psycopg2
+from psycopg2 import errorcodes
 
 from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
+from odoo.tools import mute_logger
 
+from odoo.addons.l10n_es_verifactu_oca.models.verifactu_mixin import (
+    VerifactuChainingLocked,
+)
 from odoo.addons.l10n_es_verifactu_oca.tests.common import TestVerifactuCommon
 
 
@@ -745,3 +753,263 @@ class TestL10nEsVerifactuPOS(TestVerifactuCommon):
 
         self.pos_config.journal_id.verifactu_enabled = False
         self.assertFalse(self.pos_config.verifactu_journal_enabled)
+
+    @mute_logger("odoo.addons.point_of_sale.models.pos_order")
+    def test_unpaid_order_is_not_chained(self):
+        """An order the core could not mark as paid must stay out of the chain.
+
+        The core calls action_pos_order_paid() inside a bare `except
+        Exception`, so when the payment does not add up the order silently
+        stays in draft while the sync goes on and reports success. Its
+        _logger.error is muted here: it is the expected outcome of this
+        scenario, and an ERROR line in the log fails the build.
+        """
+        self.assertFalse(
+            self.pos_config.cash_rounding,
+            "The test needs cash_rounding off so that action_pos_order_paid raises",
+        )
+        order_data = self._create_ui_order_data(amount=100)
+        # Half paid: action_pos_order_paid() raises "not fully paid"
+        order_data["amount_paid"] = 60.5
+        order_data["payment_ids"][0][2]["amount"] = 60.5
+
+        result = self.env["pos.order"].sync_from_ui([order_data])
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+
+        self.assertEqual(order.state, "draft", "An underpaid order stays draft")
+        self.assertFalse(
+            order.last_verifactu_invoice_entry_id,
+            "An unpaid order must not get a chaining entry",
+        )
+
+    def _fail_chaining(self):
+        """Patch the chaining so it raises what a lock collision would raise."""
+        return patch.object(
+            type(self.env["pos.order"]),
+            "_generate_verifactu_chaining",
+            side_effect=VerifactuChainingLocked(
+                "Could not obtain last document sent to VERI*FACTU for chaining X."
+            ),
+        )
+
+    def _fail_chaining_for_good(self):
+        """Patch the chaining so it raises a failure that will not fix itself."""
+        return patch.object(
+            type(self.env["pos.order"]),
+            "_generate_verifactu_chaining",
+            side_effect=UserError("VAT 21% tax is not mapped to VERI*FACTU."),
+        )
+
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_lock_collision_marks_order_pending(self):
+        """A chaining failure must leave a trace instead of only a log line.
+
+        Exercises the error handling, not PostgreSQL: the failure is injected as
+        the exception verifactu_mixin raises when the `FOR UPDATE NOWAIT` on the
+        chaining row hits 55P03. What is under test is that the sale is not
+        interrupted and the order stays findable.
+        """
+        orders_data = [self._create_ui_order_data()]
+        with self._fail_chaining():
+            result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+
+        self.assertEqual(order.state, "paid", "The sale must not be interrupted")
+        self.assertFalse(order.last_verifactu_invoice_entry_id)
+        self.assertTrue(
+            order.aeat_send_failed, "The failure must be visible on the order"
+        )
+        self.assertIn("Could not obtain last document", order.aeat_send_error)
+        self.assertEqual(
+            order.verifactu_chaining_attempts,
+            0,
+            "A lock collision is transient and must not spend budget",
+        )
+
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_database_error_does_not_interrupt_the_sale(self):
+        """A failure that is not a UserError must not abort the sync either.
+
+        A company with VERI*FACTU enabled and no chaining configured makes the
+        `FOR UPDATE NOWAIT` run as `WHERE id = false`, which raises a
+        ProgrammingError. Letting it escape aborts the whole sync: the sale
+        never reaches the backend and its simplified invoice number is burnt,
+        which is the opposite of what marking the order is for.
+        """
+        orders_data = [self._create_ui_order_data()]
+        failure = psycopg2.ProgrammingError(
+            "operator does not exist: integer = boolean"
+        )
+        with patch.object(
+            type(self.env["pos.order"]),
+            "_generate_verifactu_chaining",
+            side_effect=failure,
+        ):
+            result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+
+        self.assertEqual(order.state, "paid", "The sale must not be interrupted")
+        self.assertFalse(order.last_verifactu_invoice_entry_id)
+        self.assertTrue(
+            order.aeat_send_failed, "The failure must be visible on the order"
+        )
+        self.assertIn("operator does not exist", order.aeat_send_error)
+        self.assertEqual(
+            order.verifactu_chaining_attempts,
+            1,
+            "A failure that will not fix itself must spend budget",
+        )
+
+    def test_concurrency_error_is_left_to_the_framework(self):
+        """The exceptions Odoo retries on must keep travelling.
+
+        Marking the order would settle for a pending sale where a retry of the
+        request would have chained it. `_process_order` is called directly on
+        purpose, to avoid depending on how `sync_from_ui` answers an escaping
+        exception in this version.
+        """
+
+        class _SerializationFailure(psycopg2.OperationalError):
+            pgcode = errorcodes.SERIALIZATION_FAILURE
+
+        order_data = self._create_ui_order_data()
+        with (
+            patch.object(
+                type(self.env["pos.order"]),
+                "_generate_verifactu_chaining",
+                side_effect=_SerializationFailure("could not serialize access"),
+            ),
+            self.assertRaises(psycopg2.OperationalError),
+        ):
+            self.env["pos.order"]._process_order(order_data, False)
+
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_cron_recovers_pending_order(self):
+        """The sweep must chain a paid order that has no entry."""
+        orders_data = [self._create_ui_order_data()]
+        with self._fail_chaining():
+            result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+        self.assertFalse(order.last_verifactu_invoice_entry_id)
+
+        self.env["pos.order"]._cron_generate_pending_verifactu_chaining()
+
+        self.assertTrue(
+            order.last_verifactu_invoice_entry_id,
+            "The cron must chain the pending order",
+        )
+        self.assertFalse(
+            order.aeat_send_failed, "A recovered order must not stay flagged as failed"
+        )
+
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_cron_recovery_is_idempotent(self):
+        """A second pass must not add a second link for the same order."""
+        orders_data = [self._create_ui_order_data()]
+        with self._fail_chaining():
+            result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+
+        self.env["pos.order"]._cron_generate_pending_verifactu_chaining()
+        first_entry = order.last_verifactu_invoice_entry_id
+        self.env["pos.order"]._cron_generate_pending_verifactu_chaining()
+
+        entries = self.env["verifactu.invoice.entry"].search(
+            [("model", "=", "pos.order"), ("document_id", "=", order.id)]
+        )
+        self.assertEqual(len(entries), 1, "The sweep must not duplicate the link")
+        self.assertEqual(order.last_verifactu_invoice_entry_id, first_entry)
+
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_cron_stops_after_max_attempts(self):
+        """An order at the attempts ceiling must not be retried forever."""
+        self.env["ir.config_parameter"].sudo().set_param(
+            "l10n_es_verifactu_pos_oca.max_chaining_attempts", "1"
+        )
+        orders_data = [self._create_ui_order_data()]
+        with self._fail_chaining_for_good():
+            result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+        self.assertEqual(
+            order.verifactu_chaining_attempts,
+            1,
+            "A failure that will not fix itself has to reach the ceiling",
+        )
+
+        self.env["pos.order"]._cron_generate_pending_verifactu_chaining()
+
+        self.assertFalse(
+            order.last_verifactu_invoice_entry_id,
+            "At the ceiling the order is left alone, still visible in the filter",
+        )
+        self.assertTrue(order.aeat_send_failed)
+
+    def _entries_of(self, order):
+        return self.env["verifactu.invoice.entry"].search(
+            [("model", "=", "pos.order"), ("document_id", "=", str(order.id))]
+        )
+
+    def test_recovery_on_a_chained_order_is_a_no_op(self):
+        """A second link would be a second registration of the same sale.
+
+        After the first pass the domain already hides the order, so only a
+        direct call -- the manual button over RPC -- reaches the in-method
+        guard, which is why no test exercised it.
+        """
+        orders_data = [self._create_ui_order_data()]
+        result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+        entry = order.last_verifactu_invoice_entry_id
+        self.assertTrue(entry, "Sanity: the normal path chained it")
+
+        self.assertFalse(
+            order._recover_verifactu_chaining(),
+            "Recovering an order that already has a link must do nothing",
+        )
+
+        self.assertEqual(order.last_verifactu_invoice_entry_id, entry)
+        self.assertEqual(len(self._entries_of(order)), 1, "Only one link per sale")
+
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_manual_recovery_button(self):
+        """The button is the way out for a single order, and it reports back."""
+        orders_data = [self._create_ui_order_data()]
+        with self._fail_chaining():
+            result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+        self.assertFalse(order.last_verifactu_invoice_entry_id)
+
+        action = order.action_recover_verifactu_chaining()
+
+        self.assertTrue(order.last_verifactu_invoice_entry_id)
+        self.assertEqual(action["params"]["type"], "success")
+
+        # A second click has nothing to do, and says so instead of chaining again
+        again = order.action_recover_verifactu_chaining()
+        self.assertEqual(again["params"]["type"], "warning")
+        self.assertEqual(len(self._entries_of(order)), 1)
+
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_invoicing_a_pending_order_clears_its_failure(self):
+        """A pending order that ends up invoiced must leave the failed filter.
+
+        Its sale is registered through the invoice, and nothing else could
+        clear the mark: the recovery button hides out of paid/done and
+        `resend_verifactu` needs a response line the order never got.
+        """
+        orders_data = [self._create_ui_order_data()]
+        with self._fail_chaining():
+            result = self.env["pos.order"].sync_from_ui(orders_data)
+        order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+        self.assertTrue(order.aeat_send_failed, "Sanity: it is in the filter")
+        self.assertFalse(order.last_verifactu_invoice_entry_id)
+
+        order.partner_id = self.partner
+        order.action_pos_order_invoice()
+
+        self.assertTrue(order.account_move, "Sanity: it ended up invoiced")
+        self.assertFalse(
+            order.aeat_send_failed,
+            "The sale is registered through the invoice, the mark must go",
+        )
+        self.assertFalse(order.aeat_send_error)

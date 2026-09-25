@@ -40,8 +40,16 @@
                     groups="l10n_es_aeat.group_account_aeat"
                     invisible="(not verifactu_enabled) or (state not in ['paid', 'done']) or (aeat_state != 'sent_w_errors')"
                 />
+                <button
+                    type="object"
+                    string="Generate VERI*FACTU chaining"
+                    name="action_recover_verifactu_chaining"
+                    groups="l10n_es_aeat.group_account_aeat"
+                    invisible="(not verifactu_enabled) or (state not in ['paid', 'done']) or to_invoice or last_verifactu_invoice_entry_id"
+                />
             </button>
             <notebook position="inside">
+                <field name="to_invoice" invisible="1" />
                 <page
                     string="Veri*FACTU"
                     name="page_aeat"
@@ -67,6 +75,12 @@
                         <field name="verifactu_hash_string" readonly="1" />
                         <field name="verifactu_hash" readonly="1" />
                         <field name="verifactu_registration_date" readonly="1" />
+                        <field
+                            name="verifactu_chaining_attempts"
+                            string="Chaining attempts"
+                            readonly="1"
+                            invisible="verifactu_chaining_attempts == 0"
+                        />
                     </group>
                     <group string="VeriFactu History" name="group_aeat_history">
                         <field
