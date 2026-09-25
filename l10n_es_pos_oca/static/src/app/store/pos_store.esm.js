@@ -141,21 +141,4 @@ patch(PosStore.prototype, {
 
         return this.config.l10n_es_simplified_invoice_number;
     },
-
-    /**
-     * Extends receipt header data with simplified invoice info.
-     * @override
-     * @param order
-     * @returns {*}
-     */
-    getReceiptHeaderData(order) {
-        const result = super.getReceiptHeaderData(...arguments);
-        if (order) {
-            result.is_simplified_config = this.config.is_simplified_config;
-            result.partner = order.getPartner();
-            result.l10n_es_unique_id = order.l10n_es_unique_id;
-            result.to_invoice = order.to_invoice;
-        }
-        return result;
-    },
 });
