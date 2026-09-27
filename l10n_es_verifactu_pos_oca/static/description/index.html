@@ -376,6 +376,15 @@ ul.auto-toc {
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! -->
 <p><a class="reference external image-reference" href="https://odoo-community.org/page/development-status"><img alt="Beta" src="https://img.shields.io/badge/maturity-Beta-yellow.png" /></a> <a class="reference external image-reference" href="http://www.gnu.org/licenses/agpl-3.0-standalone.html"><img alt="License: AGPL-3" src="https://img.shields.io/badge/license-AGPL--3-blue.png" /></a> <a class="reference external image-reference" href="https://github.com/OCA/l10n-spain/tree/19.0/l10n_es_verifactu_pos_oca"><img alt="OCA/l10n-spain" src="https://img.shields.io/badge/github-OCA%2Fl10n--spain-lightgray.png?logo=github" /></a> <a class="reference external image-reference" href="https://translation.odoo-community.org/projects/l10n-spain-19-0/l10n-spain-19-0-l10n_es_verifactu_pos_oca"><img alt="Translate me on Weblate" src="https://img.shields.io/badge/weblate-Translate%20me-F47D42.png" /></a> <a class="reference external image-reference" href="https://runboat.odoo-community.org/builds?repo=OCA/l10n-spain&amp;target_branch=19.0"><img alt="Try me on Runboat" src="https://img.shields.io/badge/runboat-Try%20me-875A7B.png" /></a></p>
 <p>Módulo para la presentación inmediata de la facturación desde TPV.</p>
+<p>Los tiques se registran como facturas simplificadas (F2). Si más tarde
+el cliente pide factura completa, al pulsar <strong>Factura</strong> sobre el pedido
+se emite una factura de canje en sustitución del tique, que se registra
+como <strong>F3</strong> citándolo en el bloque <tt class="docutils literal">FacturasSustituidas</tt>. El tique ni
+se anula ni se rectifica, y su importe no vuelve a declararse: la
+sustitución no es una rectificación (AEAT, <em>Aclaraciones a dudas de los
+desarrolladores</em> v1.3, apartado 27, y art. 15.6 §2 del RD 1619/2012).</p>
+<p>Como toda F3 debe identificar al destinatario, el canje se rechaza si el
+pedido no tiene un cliente con NIF.</p>
 <p><strong>Table of contents</strong></p>
 <div class="contents local topic" id="contents">
 <ul class="simple">
@@ -434,8 +443,14 @@ QR code, while the backend does register the sale, falling back to the
 PoS reference as its serial number.</li>
 <li>Implement cancelling simplified and complete invoices from the PoS</li>
 <li>Configure new chaining from PoS Config</li>
-<li>Invoicing already sent simplified invoice (PoS Order). Send anullment
-for the simplified and send a new one for the complete.</li>
+<li>Factura simplificada cualificada (art. 7.2 y 7.3 ROF): capturar el NIF
+del cliente en el TPV para emitir un tique deducible
+(<tt class="docutils literal">FacturaSimplificadaArt7273</tt>) y evitar así el canje posterior.</li>
+<li>Canje de varios tiques en una única factura F3. El modelo ya lo admite
+(AEAT permite hasta 1000 facturas sustituidas y el enlace
+<tt class="docutils literal">pos.order.account_move</tt> es un uno a varios), pero falta el
+asistente: <tt class="docutils literal">action_pos_order_invoice</tt> factura los pedidos de uno en
+uno.</li>
 </ul>
 </div>
 <div class="section" id="bug-tracker">
