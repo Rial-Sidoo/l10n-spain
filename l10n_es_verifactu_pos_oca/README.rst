@@ -34,6 +34,17 @@ Comunicación Veri*FACTU: TPV
 
 Módulo para la presentación inmediata de la facturación desde TPV.
 
+Los tiques se registran como facturas simplificadas (F2). Si más tarde
+el cliente pide factura completa, al pulsar **Factura** sobre el pedido
+se emite una factura de canje en sustitución del tique, que se registra
+como **F3** citándolo en el bloque ``FacturasSustituidas``. El tique ni
+se anula ni se rectifica, y su importe no vuelve a declararse: la
+sustitución no es una rectificación (AEAT, *Aclaraciones a dudas de los
+desarrolladores* v1.3, apartado 27, y art. 15.6 §2 del RD 1619/2012).
+
+Como toda F3 debe identificar al destinatario, el canje se rechaza si el
+pedido no tiene un cliente con NIF.
+
 **Table of contents**
 
 .. contents::
@@ -86,8 +97,14 @@ Known issues / Roadmap
   PoS reference as its serial number.
 - Implement cancelling simplified and complete invoices from the PoS
 - Configure new chaining from PoS Config
-- Invoicing already sent simplified invoice (PoS Order). Send anullment
-  for the simplified and send a new one for the complete.
+- Factura simplificada cualificada (art. 7.2 y 7.3 ROF): capturar el NIF
+  del cliente en el TPV para emitir un tique deducible
+  (``FacturaSimplificadaArt7273``) y evitar así el canje posterior.
+- Canje de varios tiques en una única factura F3. El modelo ya lo admite
+  (AEAT permite hasta 1000 facturas sustituidas y el enlace
+  ``pos.order.account_move`` es un uno a varios), pero falta el
+  asistente: ``action_pos_order_invoice`` factura los pedidos de uno en
+  uno.
 
 Bug Tracker
 ===========
