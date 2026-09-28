@@ -105,7 +105,7 @@ class PosConfig(models.Model):
         ).copy(default)
 
     def write(self, vals):
-        if not self._context.get("copy_pos_config") and "name" not in vals:
+        if not self.env.context.get("copy_pos_config") and "name" not in vals:
             for pos in self:
                 sequence = pos.l10n_es_simplified_invoice_sequence_id
                 sequence.check_simplified_invoice_unique_prefix()
