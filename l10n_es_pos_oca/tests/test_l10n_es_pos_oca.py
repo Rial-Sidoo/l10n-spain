@@ -317,7 +317,7 @@ class TestL10nEsPosOca(TestPointOfSale):
         pos_order_model = self.env["pos.order"]
         initial_number = self.sequence.number_next_actual
 
-        pos_order_model._update_sequence_number(self.pos_config)
+        pos_order_model._update_l10n_es_simplified_invoice_sequence(self.pos_config)
 
         # Refresh sequence to get updated value
         self.sequence.invalidate_recordset(["number_next_actual"])
