@@ -47,7 +47,10 @@ patch(OrderReceipt.prototype, {
             nif: nif,
             numserie: (order.l10n_es_unique_id || "").substring(0, 60),
             fecha: documentDate.toFormat("dd-MM-yyyy"),
-            importe: order.amount_total.toFixed(2),
+            // The backend's amount_total only lands on the order once the sync
+            // answers, so offline it is undefined and reading it would take
+            // the whole receipt down with it. priceIncl is computed locally.
+            importe: order.priceIncl.toFixed(2),
         });
         const url = `${order.config.verifactu_base_url}?${params.toString()}`;
         return generateQRCodeDataUrl(url);
