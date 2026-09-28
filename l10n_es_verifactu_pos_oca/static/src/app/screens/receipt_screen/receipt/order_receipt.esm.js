@@ -20,7 +20,8 @@ patch(OrderReceipt.prototype, {
      */
     get verifactuQr() {
         const order = this.order;
-        const startDate = order.company.verifactu_start_date;
+        // Date fields reach the PoS as luxon DateTime, not as strings.
+        const startDate = order.company.verifactu_start_date?.toFormat("yyyy-MM-dd");
         // The registration dates the document by the UTC date of date_order
         // (see the backend's _change_date_format / _get_document_date), so
         // the QR code follows it to keep both on the same day for orders
