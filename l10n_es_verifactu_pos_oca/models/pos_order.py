@@ -285,6 +285,7 @@ class PosOrder(models.Model):
             domain = [
                 ("company_id", "=", company.id),
                 ("to_invoice", "=", False),
+                ("is_l10n_es_simplified_invoice", "=", True),
                 ("state", "in", VERIFACTU_VALID_POS_STATES),
                 ("last_verifactu_invoice_entry_id", "=", False),
                 ("verifactu_chaining_attempts", "<", max_attempts),

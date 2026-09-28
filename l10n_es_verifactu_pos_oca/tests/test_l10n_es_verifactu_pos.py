@@ -938,6 +938,35 @@ class TestL10nEsVerifactuPOS(TestVerifactuCommon):
         )
         self.assertTrue(order.aeat_send_failed)
 
+    @mute_logger("odoo.addons.l10n_es_verifactu_pos_oca.models.pos_order")
+    def test_cron_is_not_starved_by_non_simplified_orders(self):
+        """An order with no simplified number must never reach the sweep.
+
+        _recover_verifactu_chaining drops it without spending an attempt, so
+        it comes back on every pass, and being older it takes the slots of the
+        orders that can be chained. `limit` is lowered instead of creating a
+        full window's worth of orders: it is the same starvation with three
+        records rather than fifty-one.
+        """
+        older = fields.Datetime.subtract(fields.Datetime.now(), hours=1)
+        for _ in range(2):
+            order_data = self._create_ui_order_data(simplified=False)
+            order_data["to_invoice"] = False
+            order_data["date_order"] = fields.Datetime.to_string(older)
+            self.env["pos.order"].sync_from_ui([order_data])
+        pending_data = self._create_ui_order_data()
+        with self._fail_chaining():
+            result = self.env["pos.order"].sync_from_ui([pending_data])
+        pending = self.env["pos.order"].browse(result["pos.order"][0]["id"])
+        self.assertFalse(pending.last_verifactu_invoice_entry_id)
+
+        self.env["pos.order"]._cron_generate_pending_verifactu_chaining(limit=2)
+
+        self.assertTrue(
+            pending.last_verifactu_invoice_entry_id,
+            "The older non-simplified orders must not take the sweep's slots",
+        )
+
     def _entries_of(self, order):
         return self.env["verifactu.invoice.entry"].search(
             [("model", "=", "pos.order"), ("document_id", "=", str(order.id))]
