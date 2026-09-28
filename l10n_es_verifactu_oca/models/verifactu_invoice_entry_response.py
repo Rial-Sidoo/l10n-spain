@@ -123,7 +123,7 @@ class VerifactuInvoiceEntryResponse(models.Model):
         responsible_group = self.env.ref(
             "l10n_es_verifactu_oca.group_verifactu_responsible"
         )
-        users = responsible_group.users
+        users = responsible_group.user_ids
         activity_vals = []
         for record in self:
             user = users[:1] or self.env.user
