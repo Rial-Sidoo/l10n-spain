@@ -10,7 +10,7 @@ class IrSequence(models.Model):
 
     @api.constrains("prefix", "code")
     def check_simplified_invoice_unique_prefix(self):
-        if self._context.get("copy_pos_config"):
+        if self.env.context.get("copy_pos_config"):
             return
         for sequence in self.filtered(
             lambda x: x.code == "pos.config.simplified_invoice"
