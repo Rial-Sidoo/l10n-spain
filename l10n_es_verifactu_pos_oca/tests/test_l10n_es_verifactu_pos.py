@@ -104,8 +104,16 @@ class TestL10nEsVerifactuPOS(TestVerifactuCommon):
                 "account_type": "asset_current",
             }
         )
-        cls.default_journal_cash = cls.env["account.journal"].search(
-            [("company_id", "=", cls.company.id), ("type", "=", "cash")], limit=1
+        # A journal of its own: the PoS creates a default cash payment method on
+        # the company's cash journal, and 19.0 forbids sharing that journal
+        # between several cash payment methods.
+        cls.default_journal_cash = cls.env["account.journal"].create(
+            {
+                "name": "PoS Cash",
+                "type": "cash",
+                "code": "POSC",
+                "company_id": cls.company.id,
+            }
         )
         cls.default_journal_bank = cls.env["account.journal"].search(
             [("company_id", "=", cls.company.id), ("type", "=", "bank")], limit=1
