@@ -30,19 +30,6 @@ class PosOrder(models.Model):
         return float_compare(amount_total, limit, precision_digits=precision_digits) < 0
 
     @api.model
-    def _order_fields(self, ui_order):
-        res = super()._order_fields(ui_order)
-        if ui_order.get("l10n_es_unique_id", False):
-            res.update(
-                {
-                    "l10n_es_unique_id": ui_order["l10n_es_unique_id"],
-                    "l10n_es_simplified_number": ui_order["l10n_es_simplified_number"],
-                    "is_l10n_es_simplified_invoice": True,
-                }
-            )
-        return res
-
-    @api.model
     def _update_l10n_es_simplified_invoice_sequence(self, pos):
         pos.l10n_es_simplified_invoice_sequence_id.next_by_id()
 
