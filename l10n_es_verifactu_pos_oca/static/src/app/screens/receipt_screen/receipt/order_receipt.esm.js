@@ -27,13 +27,18 @@ patch(OrderReceipt.prototype, {
         // the QR code follows it to keep both on the same day for orders
         // around midnight.
         const documentDate = order.date_order.toUTC();
+        // The conditions mirror pos.order's _compute_verifactu_enabled, read
+        // from records the PoS already holds rather than from the order's own
+        // verifactu_enabled: that one is computed server-side, so an order
+        // finalized offline -- the very case this getter exists for -- reaches
+        // the receipt without it.
         const isEnabled =
-            order.verifactu_enabled &&
+            order.company.verifactu_enabled &&
             order.config.verifactu_journal_enabled &&
             order.is_l10n_es_simplified_invoice &&
             !order.to_invoice &&
             (!startDate || documentDate.toFormat("yyyy-MM-dd") >= startDate) &&
-            (!order.fiscal_position || order.fiscal_position.aeat_active);
+            (!order.fiscal_position_id || order.fiscal_position_id.aeat_active);
         if (!isEnabled) {
             return false;
         }
