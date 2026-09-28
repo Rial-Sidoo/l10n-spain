@@ -761,12 +761,16 @@ class TestL10nEsVerifactuPOS(TestVerifactuCommon):
         is not paid/done yet could not be undone afterwards, and its hash string
         would be empty (the SHA-256 of the empty string would enter the chain).
         In 19.0 an underpaid order aborts the sync instead of being left in
-        draft, so the guard is exercised directly on the order state.
+        draft, and core forbids setting a paid order back to draft, so the
+        state is forced with SQL to exercise the guard directly.
         """
         result = self.env["pos.order"].sync_from_ui([self._create_ui_order_data()])
         order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
         self.assertTrue(order._is_verifactu_order(), "Sanity: a paid order qualifies")
-        order.state = "draft"
+        self.env.cr.execute(
+            "UPDATE pos_order SET state = 'draft' WHERE id = %s", [order.id]
+        )
+        order.invalidate_recordset(["state"])
         self.assertFalse(
             order._is_verifactu_order(),
             "An order that is not paid/done must stay out of the chain",
