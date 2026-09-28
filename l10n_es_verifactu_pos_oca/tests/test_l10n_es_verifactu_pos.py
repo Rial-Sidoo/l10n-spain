@@ -754,32 +754,22 @@ class TestL10nEsVerifactuPOS(TestVerifactuCommon):
         self.pos_config.journal_id.verifactu_enabled = False
         self.assertFalse(self.pos_config.verifactu_journal_enabled)
 
-    @mute_logger("odoo.addons.point_of_sale.models.pos_order")
-    def test_unpaid_order_is_not_chained(self):
-        """An order the core could not mark as paid must stay out of the chain.
+    def test_unclosed_order_is_not_chained(self):
+        """An order that is not a closed sale must never take a link in the chain.
 
-        The core calls action_pos_order_paid() inside a bare `except
-        Exception`, so when the payment does not add up the order silently
-        stays in draft while the sync goes on and reports success. Its
-        _logger.error is muted here: it is the expected outcome of this
-        scenario, and an ERROR line in the log fails the build.
+        The chain is append-only and company-wide, so a link for an order that
+        is not paid/done yet could not be undone afterwards, and its hash string
+        would be empty (the SHA-256 of the empty string would enter the chain).
+        In 19.0 an underpaid order aborts the sync instead of being left in
+        draft, so the guard is exercised directly on the order state.
         """
-        self.assertFalse(
-            self.pos_config.cash_rounding,
-            "The test needs cash_rounding off so that action_pos_order_paid raises",
-        )
-        order_data = self._create_ui_order_data(amount=100)
-        # Half paid: action_pos_order_paid() raises "not fully paid"
-        order_data["amount_paid"] = 60.5
-        order_data["payment_ids"][0][2]["amount"] = 60.5
-
-        result = self.env["pos.order"].sync_from_ui([order_data])
+        result = self.env["pos.order"].sync_from_ui([self._create_ui_order_data()])
         order = self.env["pos.order"].browse(result["pos.order"][0]["id"])
-
-        self.assertEqual(order.state, "draft", "An underpaid order stays draft")
+        self.assertTrue(order._is_verifactu_order(), "Sanity: a paid order qualifies")
+        order.state = "draft"
         self.assertFalse(
-            order.last_verifactu_invoice_entry_id,
-            "An unpaid order must not get a chaining entry",
+            order._is_verifactu_order(),
+            "An order that is not paid/done must stay out of the chain",
         )
 
     def _fail_chaining(self):
