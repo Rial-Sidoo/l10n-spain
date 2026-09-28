@@ -8,9 +8,13 @@
     "application": False,
     "installable": True,
     "depends": ["l10n_es_pos_oca", "l10n_es_verifactu_oca"],
+    "post_init_hook": "post_init_hook",
     "assets": {
         "point_of_sale._assets_pos": [
             "l10n_es_verifactu_pos_oca/static/src/**/*",
+        ],
+        "web.assets_tests": [
+            "l10n_es_verifactu_pos_oca/static/tests/tours/**/*",
         ],
     },
     "data": [
