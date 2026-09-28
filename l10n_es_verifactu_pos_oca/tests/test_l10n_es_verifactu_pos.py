@@ -720,6 +720,18 @@ class TestL10nEsVerifactuPOS(TestVerifactuCommon):
         """The PoS UI needs the start date to hide the QR code before it."""
         fields = self.env["res.company"]._load_pos_data_fields(self.pos_config)
         self.assertIn("verifactu_start_date", fields)
+        self.assertIn("verifactu_enabled", fields)
+
+    def test_pos_fiscal_position_aeat_flag_reaches_the_pos_ui(self):
+        """The PoS UI needs aeat_active to hide the QR on an excluded position.
+
+        account.fiscal.position loads a closed list of fields, so without this
+        the receipt cannot tell an excluded position from an included one.
+        """
+        fields = self.env["account.fiscal.position"]._load_pos_data_fields(
+            self.pos_config
+        )
+        self.assertIn("aeat_active", fields)
 
     def test_pos_verifactu_journal_flag_reaches_the_pos_ui(self):
         """The PoS UI needs the journal flag to hide the QR when it is off.
