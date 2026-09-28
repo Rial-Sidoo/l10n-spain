@@ -92,7 +92,6 @@ class TestL10nEsPosOca(TestPointOfSale):
         receivable = self.env["account.account"].search(
             [
                 ("account_type", "=", "asset_receivable"),
-                ("deprecated", "=", False),
                 ("company_ids", "in", [company.id]),
             ],
             limit=1,
