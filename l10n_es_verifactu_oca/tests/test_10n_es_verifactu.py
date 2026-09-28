@@ -511,20 +511,16 @@ class TestVerifactuSendResponse(TestVerifactuCommon):
         # Activate certificate and re-run the cron
         self._activate_certificate(self.certificate_password)
         self.env["verifactu.invoice.entry"]._cron_send_documents_to_verifactu()
-        activity_done = (
-            self.env["mail.activity"]
-            .with_context(active_test=False)
-            .search(
-                [
-                    ("activity_type_id", "=", ActivityType.id),
-                    ("res_model", "=", "verifactu.invoice.entry.response"),
-                ]
-            )
+        # Done activities are kept archived in 19.0, so only the ones still
+        # visible to the user (active) count.
+        pending_activities = MailActivity.search(
+            [
+                ("activity_type_id", "=", ActivityType.id),
+                ("res_model", "=", "verifactu.invoice.entry.response"),
+            ]
         )
-        # todo: fix this, it's not activity_done.has_recommended_activites,
-        #  should check if it's not visible anymore to the user
         self.assertFalse(
-            activity_done.has_recommended_activities,
+            pending_activities,
             "The exception activity should not appear.",
         )
 
