@@ -50,7 +50,7 @@ patch(OrderReceipt.prototype, {
             // The backend's amount_total only lands on the order once the sync
             // answers, so offline it is undefined and reading it would take
             // the whole receipt down with it. priceIncl is computed locally.
-            importe: order.priceIncl.toFixed(2),
+            importe: order.currency.round(order.priceIncl).toFixed(2),
         });
         const url = `${order.config.verifactu_base_url}?${params.toString()}`;
         return generateQRCodeDataUrl(url);
