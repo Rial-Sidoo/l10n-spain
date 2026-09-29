@@ -119,7 +119,13 @@ patch(PosStore.prototype, {
             if (!this.hasPendingOrders()) {
                 this.incrementSimplifiedInvoiceNumber();
             }
-            console.error(error);
+            // A lost connection is the case this branch handles, so it is not
+            // an error; anything else reaching here still is.
+            if (error instanceof ConnectionLostError) {
+                console.warn(error);
+            } else {
+                console.error(error);
+            }
         }
 
         if (this.hasPendingOrders()) {
