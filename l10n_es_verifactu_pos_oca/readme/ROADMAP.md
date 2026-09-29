@@ -1,3 +1,9 @@
+- The post-install hook refreshes the tills on installation only: after
+  upgrading the module, an already running till keeps its cached data until
+  its own configuration changes.
+- With a connection the server stamps its own time on the running order's
+  date_order, so around the UTC day change, or with a skewed terminal clock,
+  the ticket QR code may not match the registration.
 - The amount in the ticket QR code is the order total, while the
   registration adjusts it by the taxes mapped as not included in it: the
   base of the exempt not subject ones goes down, and the quota of the
